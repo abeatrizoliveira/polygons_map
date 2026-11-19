@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa Polígonos</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+  <style>
+    :root {
+      --fundo: #f6f7f9;
+      --painel: #ffffff;
+      --texto: #1d2430;
+      --suave: #5b6676;
+      --borda: #d9dee5;
+      --escolar: #57b6ff;
+      --industrial: #ff9751;
+      --residencial: #42ff94;
+      --erro: #b3261e;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fundo: #2b2b2b;
+        --painel: #1c222b;
+        --texto: #e8ecf1;
+        --suave: #98a3b3;
+        --borda: #b0bdcf;
+        --erro: #ff8a80;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--fundo);
+      color: var(--texto);
+    }
+
+    aside {
+      background: var(--fundo);
+      border-right: 2px solid var(--borda);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    h1 {
+      font-size: 1.15rem;
+      margin: 0 0 4px;
+    }
+
+    h2 {
+      font-size: .95rem;
+      margin: 20px 0 8px;
+    }
+
+    p.sub {
+      margin: 0 0 12px;
+      color: var(--suave);
+      font-size: .85rem;
+      line-height: 1.4;
+    }
+
+    label {
+      display: block;
+      font-size: .85rem;
+      margin: 10px 0 4px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 8px;
+      font: inherit;
+      color: inherit;
+      background: var(--fundo);
+      border: 2px solid var(--borda);
+      border-radius: 6px;
+    }
+
+    fieldset {
+      border: 2px solid var(--borda);
+      border-radius: 6px;
+      margin: 10px 0 0;
+      padding: 6px 10px 8px;
+    }
+
+    legend {
+      font-size: .85rem;
+      padding: 0 4px;
+    }
+
+    label.check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+
+    label.check input {
+      width: auto;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--escolar);
+      outline-offset: 2px;
+    }
+
+    #aviso {
+      min-height: 1.3em;
+      margin: 8px 0 0;
+      font-size: .85rem;
+      color: var(--suave);
+    }
+
+    #aviso.erro {
+      color: var(--erro);
+    }
+
+    .legenda,
+    #lista {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .legenda li,
+    #lista li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: .88rem;
+    }
+
+    .cor {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex: none;
+      opacity: .85;
+    }
+
+    #lista li {
+      border-bottom: 2px solid var(--borda);
+    }
+
+    #lista button.nome {
+      flex: 1;
+      text-align: left;
+      background: none;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #lista button.nome small {
+      display: block;
+      color: var(--suave);
+    }
+
+    #lista button.rm {
+      background: none;
+      border: 2px solid var(--borda);
+      border-radius: 6px;
+      color: var(--suave);
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: .8rem;
+    }
+
+    #lista button.rm:hover {
+      color: var(--erro);
+      border-color: var(--erro);
+    }
+
+    #resultado {
+      padding: 10px;
+      border: 2px solid var(--borda);
+      border-radius: 6px;
+      font-size: .9rem;
+      line-height: 1.45;
+    }
+
+    #mapa {
+      height: 100%;
+      min-height: 360px;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 70vh;
+        height: auto;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 2px solid var(--borda);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <aside>
+    <h1>Polígonos e Áreas {}</h1>
+    <p class="sub">Clique no mapa para descobrir o tipo de área de um ponto. Para cadastrar, informe o nome, marque o
+      tipo e desenhe o polígono no mapa.</p>
+
+    <h2>Novo cadastro</h2>
+    <label for="nome">Nome da área</label>
+    <input id="nome" type="text" maxlength="100" placeholder="Digite o nome da área aqui">
+    <fieldset>
+      <legend>Tipo da área</legend>
+      <label class="check"><input type="radio" name="tipo" value="escolar"> Escolar</label>
+      <label class="check"><input type="radio" name="tipo" value="industrial"> Industrial</label>
+      <label class="check"><input type="radio" name="tipo" value="residencial"> Residencial</label>
+    </fieldset>
+    <p id="aviso" role="status"></p>
+
+    <h2>Resultado da consulta</h2>
+    <div id="resultado">Clique em um ponto do mapa.</div>
+
+    <h2>Legenda</h2>
+    <ul class="legenda">
+      <li><span class="cor" style="background:var(--escolar)"></span>Escolar</li>
+      <li><span class="cor" style="background:var(--industrial)"></span>Industrial</li>
+      <li><span class="cor" style="background:var(--residencial)"></span>Residencial</li>
+    </ul>
+
+    <h2>Áreas cadastradas</h2>
+    <ul id="lista"></ul>
+  </aside>
+
+  <div id="mapa"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  {% raw %}
+  <script>
+    const CORES = { escolar: '#57b6ff', industrial: '#ff9751', residencial: '#42ff94' };
+    const ROTULOS = { escolar: 'Escolar', industrial: 'Industrial', residencial: 'Residencial' };
+
+    const map = L.map('mapa').setView([-23.3053, -45.9658], 14); // Jacareí - SP
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    const camadaAreas = L.featureGroup().addTo(map);
+    const camadaPonto = L.layerGroup().addTo(map);
+    const poligonosPorId = {};
+    let desenhando = false;
+
+    //  utilidades 
+    async function api(url, opcoes) {
+      const resp = await fetch(url, opcoes);
+      const corpo = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(corpo.erro || 'Erro ' + resp.status);
+      return corpo;
+    }
+
+    function aviso(texto, erro = false) {
+      const el = document.getElementById('aviso');
+      el.textContent = texto;
+      el.className = erro ? 'erro' : '';
+    }
+
+    // áreas: carregar e exibir 
+    async function carregarAreas() {
+      const areas = await api('/api/areas');
+      camadaAreas.clearLayers();
+      Object.keys(poligonosPorId).forEach(id => delete poligonosPorId[id]);
+      const lista = document.getElementById('lista');
+      lista.replaceChildren();
+
+      if (areas.length === 0) {
+        const vazio = document.createElement('li');
+        vazio.textContent = 'Nenhuma área cadastrada ainda.';
+        lista.appendChild(vazio);
+      }
+
+
+      for (const a of areas) {
+        const cor = CORES[a.tipo] || '#737b86';
+
+        const poligono = L.polygon(a.coordenadas, {
+          color: cor,
+          weight: 2,
+          fillColor: cor,
+          fillOpacity: 0.5
+        }).addTo(camadaAreas);
+
+        const tipoLabel = ROTULOS[a.tipo] || 'Sem classificação';
+
+        poligono.bindTooltip(
+          a.nome + ' (' + tipoLabel + ')',
+          { sticky: true }
+        );
+
+        poligonosPorId[a.id] = poligono;
+
+        const li = document.createElement('li');
+
+        const marcador = document.createElement('span');
+        marcador.className = 'cor';
+        marcador.style.background = cor;
+
+        const nome = document.createElement('button');
+        nome.className = 'nome';
+        nome.type = 'button';
+        nome.textContent = a.nome;
+
+        const tipoElemento = document.createElement('small');
+        tipoElemento.textContent = tipoLabel;
+        nome.appendChild(tipoElemento);
+
+        nome.addEventListener('click', () =>
+          map.fitBounds(poligono.getBounds(), { maxZoom: 16 })
+        );
+
+        const rm = document.createElement('button');
+        rm.className = 'rm';
+        rm.type = 'button';
+        rm.textContent = 'Excluir';
+        rm.addEventListener('click', () => excluirArea(a.id, a.nome));
+
+        li.append(marcador, nome, rm);
+        lista.appendChild(li);
+      }
+
+    }
+
+    async function excluirArea(id, nome) {
+      if (!confirm('Excluir a área "' + nome + '"?')) return;
+      try {
+        await api('/api/areas/' + id, { method: 'DELETE' });
+        camadaPonto.clearLayers();
+        await carregarAreas();
+        aviso('Área excluída.');
+      } catch (e) {
+        aviso(e.message, true);
+      }
+    }
+
+    //  cadastro: desenhar polígono 
+    map.addControl(new L.Control.Draw({
+      draw: {
+        polygon: { allowIntersection: false, showArea: false, shapeOptions: { color: '#555', weight: 2 } },
+        polyline: false, rectangle: false, circle: false, marker: false, circlemarker: false
+      },
+      edit: false
+    }));
+
+    map.on(L.Draw.Event.DRAWSTART, () => { desenhando = true; });
+    map.on(L.Draw.Event.DRAWSTOP, () => setTimeout(() => { desenhando = false; }, 0));
+
+
+    map.on(L.Draw.Event.CREATED, async (e) => {
+      const nome = document.getElementById('nome').value.trim();
+
+      const tipoSelecionado = document.querySelector(
+        'input[name="tipo"]:checked'
+      )?.value;
+
+      if (!nome) {
+        aviso('Digite o nome da área e desenhe o polígono de novo.', true);
+        return;
+      }
+
+      if (!tipoSelecionado) {
+        aviso('Selecione um tipo e desenhe o polígono novamente.', true);
+        return;
+      }
+
+      const coordenadas = e.layer.getLatLngs()[0].map(p => [
+        p.lat,
+        p.lng
+      ]);
+
+      try {
+        await api('/api/areas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome,
+            tipo: tipoSelecionado,
+            coordenadas
+          })
+        });
+
+        document.getElementById('nome').value = '';
+
+        document.querySelectorAll('input[name="tipo"]').forEach(c => {
+          c.checked = false;
+        });
+
+        await carregarAreas();
+        aviso('Área "' + nome + '" cadastrada.');
+
+      } catch (err) {
+        aviso(err.message, true);
+      }
+    });
+
+    // consulta: clicar em um ponto 
+    map.on('click', async (e) => {
+      if (desenhando) return;
+      const { lat, lng } = e.latlng;
+
+      camadaPonto.clearLayers();
+      L.circleMarker(e.latlng, { radius: 7, color: '#111', weight: 2, fillColor: '#fff', fillOpacity: 1 }).addTo(camadaPonto);
+
+      const caixa = document.getElementById('resultado');
+      try {
+        const r = await api('/api/consulta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng })
+        });
+
+        let texto;
+        if (r.tipos.length === 0) {
+          texto = 'Este ponto não está em nenhuma área cadastrada.';
+        } else {
+          const nomesTipos = r.tipos.map(t => ROTULOS[t]).join(' e ');
+          const nomesAreas = r.areas.map(a => a.nome).join(', ');
+          texto = 'Área ' + nomesTipos + '. Polígonos: ' + nomesAreas + '.';
+        }
+        caixa.textContent = lat.toFixed(5) + ', ' + lng.toFixed(5) + ': ' + texto;
+        L.popup().setLatLng(e.latlng).setContent(document.createTextNode(texto)).openOn(map);
+      } catch (err) {
+        caixa.textContent = err.message;
+      }
+    });
+
+    carregarAreas()
+      .catch(err => aviso(err.message, true));
+  </script>
+  {% endraw %}
+</body>
+
+</html>
